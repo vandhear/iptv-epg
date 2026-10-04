@@ -36,3 +36,16 @@ for ch in found.values():
 ET.indent(out)
 ET.ElementTree(out).write("custom.channels.xml", encoding="UTF-8", xml_declaration=True)
 print("Найдено EPG для каналов:", len(found), "из", len(playlist_ids))
+
+# по одному файлу на сайт: падение одного источника не ломает остальные
+import os, collections
+os.makedirs("per_site", exist_ok=True)
+groups = collections.defaultdict(list)
+for ch in found.values():
+    groups[ch.get("site")].append(ch)
+for site, chs in groups.items():
+    r = ET.Element("channels")
+    r.extend(chs)
+    ET.indent(r)
+    ET.ElementTree(r).write(f"per_site/{site}.channels.xml", encoding="UTF-8", xml_declaration=True)
+print("Сайтов-источников:", len(groups))

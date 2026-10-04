@@ -40,12 +40,23 @@ jobs:
         working-directory: epg
         run: python ../scripts/build_channels.py
 
-      - name: Grab guide
+      - name: Grab guide per site
         working-directory: epg
         env:
-          NODE_OPTIONS: --max-old-space-size=12288
-        run: npm run grab --- --channels=custom.channels.xml --output=guide.xml --days=2 --maxConnections=5
-        continue-on-error: true   # часть источников может быть мертва
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          mkdir -p out
+          for f in per_site/*.channels.xml; do
+            site=$(basename "$f" .channels.xml)
+            echo "::group::$site"
+            timeout 25m npm run grab --- --channels="$f" --output="out/$site.xml" --days=2 --maxConnections=5 \
+              || echo "::warning::источник $site упал, пропускаю"
+            echo "::endgroup::"
+          done
+
+      - name: Merge guides
+        working-directory: epg
+        run: python ../scripts/merge_guides.py
 
       - name: Prepare site
         run: |
