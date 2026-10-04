@@ -16,7 +16,7 @@ def base(i):  # "Channel.ru@SD" -> "Channel.ru"
 
 
 by_base = {base(i): i for i in playlist_ids}
-found = {}  # playlist_id -> элемент <channel>
+found = {}  # (playlist_id, site, site_id) -> элемент <channel>
 
 for path in sorted(glob.glob("sites/**/*.channels.xml", recursive=True)):
     try:
@@ -26,16 +26,16 @@ for path in sorted(glob.glob("sites/**/*.channels.xml", recursive=True)):
     for ch in root.iter("channel"):
         xid = ch.get("xmltv_id", "")
         pid = xid if xid in playlist_ids else by_base.get(base(xid))
-        if pid and pid not in found:  # берём первый найденный источник
+        if pid:  # берём ВСЕ источники: лучший выберет merge_guides.py
             ch.set("xmltv_id", pid)
-            found[pid] = ch
+            found.setdefault((pid, ch.get("site"), ch.get("site_id")), ch)
 
 out = ET.Element("channels")
 for ch in found.values():
     out.append(ch)
 ET.indent(out)
 ET.ElementTree(out).write("custom.channels.xml", encoding="UTF-8", xml_declaration=True)
-print("Найдено EPG для каналов:", len(found), "из", len(playlist_ids))
+print("Каналов с источником:", len({k[0] for k in found}), "из", len(playlist_ids), "; записей:", len(found))
 
 # по одному файлу на сайт: падение одного источника не ломает остальные
 import os, collections

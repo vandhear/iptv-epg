@@ -1,27 +1,31 @@
-"""Склеивает epg/out/*.xml в один XMLTV. Запускать из корня клона iptv-org/epg."""
-import glob, sys
+"""Склеивает epg/out/*.xml в guide.xml. Для каждого канала берётся ОДИН источник —
+тот, что отдал больше всего передач. Запускать из корня клона iptv-org/epg."""
+import glob, sys, collections
 import xml.etree.ElementTree as ET
 
-channels, programmes, seen = {}, [], set()
+best = {}  # channel_id -> (count, [programmes], channel_element)
 for path in sorted(glob.glob("out/*.xml")):
     try:
         root = ET.parse(path).getroot()
     except ET.ParseError:
         print("пропуск битого файла:", path)
         continue
-    for ch in root.findall("channel"):
-        channels.setdefault(ch.get("id"), ch)
+    progs = collections.defaultdict(list)
     for p in root.findall("programme"):
-        key = (p.get("channel"), p.get("start"))
-        if key not in seen:
-            seen.add(key)
-            programmes.append(p)
+        progs[p.get("channel")].append(p)
+    chans = {c.get("id"): c for c in root.findall("channel")}
+    for cid, plist in progs.items():
+        if cid not in best or len(plist) > best[cid][0]:
+            best[cid] = (len(plist), plist, chans.get(cid))
 
 tv = ET.Element("tv", {"generator-info-name": "iptv-epg"})
-tv.extend(channels.values())
-tv.extend(programmes)
+for cid, (n, plist, ch) in best.items():
+    if ch is not None:
+        tv.append(ch)
+for cid, (n, plist, ch) in best.items():
+    tv.extend(plist)
 ET.indent(tv)
 ET.ElementTree(tv).write("guide.xml", encoding="UTF-8", xml_declaration=True)
-print("каналов:", len(channels), "программ:", len(programmes))
-if not programmes:
+print("каналов:", len(best), "программ:", sum(v[0] for v in best.values()))
+if not best:
     sys.exit(1)

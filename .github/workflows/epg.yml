@@ -58,6 +58,11 @@ jobs:
         working-directory: epg
         run: python ../scripts/merge_guides.py
 
+      - name: Fallback from external XMLTV
+        working-directory: epg
+        run: python ../scripts/fallback_external.py
+        continue-on-error: true
+
       - name: Prepare site
         run: |
           mkdir site
