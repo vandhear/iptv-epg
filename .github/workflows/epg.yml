@@ -1,0 +1,68 @@
+name: update-epg
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # раз в сутки, 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone iptv-org/epg
+        run: git clone --depth 1 -b master https://github.com/iptv-org/epg.git epg
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        working-directory: epg
+        run: npm install
+
+      - name: Build custom.channels.xml
+        working-directory: epg
+        run: python ../scripts/build_channels.py
+
+      - name: Grab guide
+        working-directory: epg
+        run: npm run grab --- --channels=custom.channels.xml --output=guide.xml --days=3 --maxConnections=10
+        continue-on-error: true   # часть источников может быть мертва
+
+      - name: Prepare site
+        run: |
+          mkdir site
+          test -s epg/guide.xml || { echo "guide.xml пуст"; exit 1; }
+          cp epg/guide.xml site/guide.xml
+          gzip -k site/guide.xml
+          cp epg/custom.channels.xml site/channels.xml
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
