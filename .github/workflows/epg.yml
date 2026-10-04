@@ -42,7 +42,9 @@ jobs:
 
       - name: Grab guide
         working-directory: epg
-        run: npm run grab --- --channels=custom.channels.xml --output=guide.xml --days=3 --maxConnections=10
+        env:
+          NODE_OPTIONS: --max-old-space-size=12288
+        run: npm run grab --- --channels=custom.channels.xml --output=guide.xml --days=2 --maxConnections=5
         continue-on-error: true   # часть источников может быть мертва
 
       - name: Prepare site
